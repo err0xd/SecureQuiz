@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>資通安全概論測驗</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --success-color: #2ecc71;
+            --warning-color: #f1c40f;
+            --danger-color: #e74c3c;
+            --light-bg: #f5f7fa;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--light-bg);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1, h2, h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .hidden { display: none !important; }
+
+        input[type="password"], input[type="number"], input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+
+        button:hover { background-color: #357abd; }
+        button.secondary { background-color: #95a5a6; }
+
+        .progress {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .status {
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ddd;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .status:hover { transform: scale(1.1); }
+        .unanswered { background: white; color: #666; }
+        .answered { background: var(--success-color); color: white; border-color: var(--success-color); }
+        .marked { background: var(--warning-color); color: white; border-color: var(--warning-color); }
+        .current { border: 2px solid #2c3e50; font-weight: bold; }
+
+        .question-box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e1e1e1;
+        }
+
+        .question-content {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .options-list label {
+            display: block;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .options-list label:hover { background: #e2e6ea; }
+
+        .options-list input { margin-right: 10px; }
+
+        .result-summary {
+            text-align: center;
+            padding: 20px;
+            background: #f1f8ff;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .review-item {
+            border: 1px solid #eee;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        .review-item.correct-answer-item { border-left: 5px solid var(--success-color); }
+        .review-item.wrong-answer-item { border-left: 5px solid var(--danger-color); }
+
+        .review-option {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+
+        .opt-correct { background-color: #d4edda; color: #155724; font-weight: bold; }
+        .opt-wrong-choice { background-color: #f8d7da; color: #721c24; text-decoration: line-through; }
+        .opt-normal { color: #555; }
+
+        .explanation {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #fff3cd;
+            border-radius: 5px;
+            color: #856404;
+            font-size: 0.95em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- 開始畫面 -->
+    <div id="login-section" class="section">
+        <h1>資通安全概論測驗</h1>
+        <div style="background: #eef2f7; padding: 20px; border-radius: 8px;">
+            <p style="margin-bottom: 15px;">點擊下方按鈕開始測驗（無需輸入代碼）</p>
+            <button onclick="startQuiz()">開始考試</button>
+            <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                <!--a href="#" onclick="showEncryptPage(); return false;" style="color: #999; text-decoration: none;">(管理者設定)</a-->
+            </div>
+        </div>
+    </div>
+
+    <!-- 明文題目 + 加密答案 -->
+    <script>
+        // 明文題目（不含答案與解析，但包含是否多選）
+        const plainQuiz = [{"id":"1","content":"依據《資通安全管理法》定義，資通安全的主要目標是為了確保資通系統或資訊的哪三個核心屬性（CIA）？","a":"機密性、完整性、便利性","b":"機密性、完整性、可用性","c":"準確性、完整性、可用性","d":"機密性、不可否認性、便利性","score":5,"chapter":"單元1","isMultiple":false},{"id":"2","content":"在資通系統的關鍵要素中，哪一個環節常被視為最脆弱、最容易成為社交工程攻擊目標，而非單純的技術漏洞？","a":"軟體 (Software)","b":"硬體 (Hardware)","c":"網路 (Network)","d":"人員 (People)","score":5,"chapter":"單元1","isMultiple":false},{"id":"3","content":"下列哪一項技術或措施主要用於確保資訊的「完整性」，防止資訊在傳輸或儲存過程中被竄改？","a":"資料加密","b":"數位簽章與雜湊函數","c":"異地備援","d":"流量清洗","score":5,"chapter":"單元1","isMultiple":false},{"id":"4","content":"關於資通安全防護目標中「可用性 (Availability)」的描述，下列何者正確？","a":"確保資訊不被未經授權的人員存取","b":"確保資訊內容正確且未被竄改","c":"確保資訊與資源在需要時可被授權使用者存取與使用","d":"確保組織遵循相關法律規範","score":5,"chapter":"單元1","isMultiple":false},{"id":"5","content":"依據 CNS 27002 的資產分類，「主要資產」除了資訊（Information）外，還包含下列何者？","a":"硬體","b":"軟體","c":"營運過程及活動","d":"人員","score":5,"chapter":"單元1","isMultiple":false},{"id":"6","content":"下列何者不是保護資訊「機密性」的常見技術？","a":"資料加密","b":"存取控制","c":"去識別化","d":"負載平衡","score":5,"chapter":"單元1","isMultiple":false},{"id":"7","content":"當發生資安事件導致網頁內容被駭客惡意竄改（例如首頁被置換），這主要是違反了哪一個資安屬性？","a":"機密性","b":"完整性","c":"可用性","d":"不可否認性","score":5,"chapter":"單元1","isMultiple":false},{"id":"8","content":"關於「資通服務」的定義，下列敘述何者正確？","a":"僅指硬體設備的租賃服務","b":"指與資訊之蒐集、控制、傳輸、儲存、流通等處理相關之服務","c":"僅指軟體的開發服務","d":"僅指雲端運算服務","score":5,"chapter":"單元1","isMultiple":false},{"id":"9","content":"為了保護資料的「可用性」，避免因天災或人為疏失導致服務中斷，應採取下列哪項措施？","a":"資料加密","b":"數位浮水印","c":"系統備份與備援","d":"社交工程演練","score":5,"chapter":"單元1","isMultiple":false},{"id":"10","content":"對於政府機關而言，除了 CIA 三要素外，還必須重視哪一個目標，以避免因違法而面臨法律責任？","a":"法律遵循性 (Legal Compliance)","b":"成本效益性","c":"技術先進性","d":"國際互通性","score":5,"chapter":"單元1","isMultiple":false},{"id":"11","content":"我國資通安全管理體系中，負責「決策」國家資通安全政策的最高層級單位是？","a":"數位發展部","b":"國家資通安全研究院","c":"行政院國家資通安全會報","d":"內政部警政署","score":5,"chapter":"單元2","isMultiple":false},{"id":"12","content":"依據《資通安全管理法》，下列何者屬於該法的適用對象？","a":"所有私人企業","b":"軍事機關與情報機關","c":"公務機關與特定非公務機關","d":"一般民眾","score":5,"chapter":"單元2","isMultiple":false},{"id":"13","content":"公務機關或特定非公務機關在「知悉」資通安全事件後，應於多久時間內進行通報？","a":"1 小時內","b":"8 小時內","c":"24 小時內","d":"36 小時內","score":5,"chapter":"單元2","isMultiple":false},{"id":"14","content":"依據《資通安全責任等級分級辦法》，資通安全責任等級由高至低分為哪五級？","a":"1、2、3、4、5 級","b":"A、B、C、D、E 級","c":"特級、一級、二級、三級、四級","d":"高、中、低、微、無","score":5,"chapter":"單元2","isMultiple":false},{"id":"15","content":"依據《資通安全管理法》修正後規定，公務機關對於「危害國家資通安全產品」的使用規範為何？","a":"僅需登記後即可使用","b":"禁止使用，例外情形得專案報核准","c":"僅限制採購，已採購者可繼續使用","d":"完全沒有限制","score":5,"chapter":"單元2","isMultiple":false},{"id":"16","content":"依據《國家機密保護法》，「絕對機密」的保密期限最長不得超過幾年？","a":"10 年","b":"20 年","c":"30 年","d":"50 年","score":5,"chapter":"單元2","isMultiple":false},{"id":"17","content":"依據《資通安全管理法》規定，公務機關應設置哪一職位，負責推動及監督機關內資通安全事務？","a":"資訊長","b":"資通安全長","c":"隱私保護官","d":"稽核長","score":5,"chapter":"單元2","isMultiple":false},{"id":"18","content":"發生第三級或第四級資通安全事件（重大事件）時，公務機關應於事件發生後多久時間內完成損害控制或復原？","a":"12 小時內","b":"24 小時內","c":"36 小時內","d":"72 小時內","score":5,"chapter":"單元2","isMultiple":false},{"id":"19","content":"依據《資通安全管理法施行細則》，資通安全維護計畫應包含的內容中，下列何者正確？","a":"僅需包含資訊設備清單","b":"應包含核心業務、風險評估、防護措施及委外管理等項目","c":"僅需包含防毒軟體安裝紀錄","d":"僅需包含年度預算表","score":5,"chapter":"單元2","isMultiple":false},{"id":"20","content":"《資通安全管理法》的主管機關為下列何者？","a":"行政院資通安全處","b":"國家發展委員會","c":"數位發展部","d":"國家通訊傳播委員會","score":5,"chapter":"單元2","isMultiple":false}];
+
+        // 加密的答案與解析（管理者從加密頁面複製）
+        const encryptedAnswers = "U2FsdGVkX188Gs+4bqsZs/8hhlkscjUKcqnmJtMBLW3SdgxVXAM0lPcr2OJ+oagMZOfGzywCO04l4bvzFrWpRtn0cQ8MdWDk618+ED0PW0eDdayeTdU0spJjUn9sYnEbN7eliWPaiSmaj/OE0V0oOuIxaDXm6/ooDGfSF/K7kESzgp37AvJJKZZjkoPtEjlYHh199e9kGENoTQnVxeHln+2VISZ6A2I89l1t59XMxhLPk9iXXPlM++dsSYe+PhSGLp63E3zARbnnTv4OvGQDRxJiSJjRfXrlXtCs/kuaj6en3rLpcXTJ3UxxKpBucAMEw5EBX1jQMhyw0tt3Iqv5k2VZchF6x3JA4qLhCD8XiT/T1LH3WC7UmnDtX4dNqKA0q00bq29hTlRhxot9g98Js8a2DH+K+geaqDGQ8b2bffcSsN3c4E17/oYzMdJ2Eg1k8pcfmUl5HmXgIrv8Yocuue4el7w4P/C3cGreVVZ6gVu3sqaB9JZ3HwXucexRYnECSDZbvCEtrnIV1WHVVw8oOIpayEbZzTFdd0h8XoOQeYj4DgMNiznYDob8/PL7OoOfJElPVqqPNjDlH/W7VMk98W+Wl4Y3fO7WSMeOhV2HZSk/YCXKgG5aW4PNcB7CH4pX7tEFVE4e4XOa5LPEJ2v6HiTUP7VUNR+APDXhZtkYvbogFgYobOfDggvGGGSrMGvRG9ICk6BR/O//KP3qvgIZCRWwLVD2lF3ru173yJKX136/BRYFUeGUHuFGJCUux8DuE4VXZgA0IqE0lodhkZm6UQWQGseot6kunU0Zi5+QCh5TepC+hSxjLXVLnNGPa3p3Nr2I8Hqcq0jaH2Z6MF62A5aFvKlDKNMcrgUCq1CMZ0lNbdtOQ+36gFk2r6JhbKrtK70lCUxcJkRpAPfbewtT1TQZmq9S1A8UVowPNMXLeUsMc5JYEaVtMZiC9eV7BUU+FjAGWSf0BTjEoIOb/FV5Patw7+3uh+7WPFGYqfr5SrTHFLf/50KQMg2wh9mCLUZ3nQMj5Ga3J9nBBW7A8zbWOzt7v5xzU3vqBW7ro1ue9up0YNfCU2pOl+lddkMKGpabD4qfm6xrgQubPkiXSiSbYq4UzyQ+nTidVdy27s7cLFPEmagUbNdqSXii9g0mvus9wu0okqTOPK3g1QuYkGLuKxd3ZH5FXq4oIzWop82qxa9liQDM2YOXguoJbzRL/Ic2F1zWmaZ7KN6StC81yeoqniUrdEYQOW/WSgfF52Am0DwfCe9mt89/oL2+fNLq7xr6vTK49mjiJ3G5Bpbh3+J6W13wVChfqLsq4hwWSGUYPU6YbI+wIZVIA1M/2axxOczLfzzfqeBvoL5XzWMYGECgC05vgAkOUBhiwqO7DfkXw8gdKku0CKYvjGwYY1GHUbGMGFHOdlDjsaGz1+/6rO4owJ2iUziGsqclAE1POiafGtUhflMm5xhN26R+E1+HMt5fwaCkc/8pO0oKX0zTPBg4aIuFUzlcTi5mUBaTK/7Gy926pLoXR1e9zCA/qSvYKAVYCbgAqQFUTeLKqG4f/g3TOX2mx03vj1xtk7q5cCBcHl4ubXpLfm8uRzOe9V091grEevXM8RRxdbNYfRbjMeesuCeCb7DVty4vGGwpHh4C9hgvT3aha5Tfd1m/I/hEM+k+oXMbbf/7AVnZSP8ou0NCCUAI6ht6pqCc0qf8niKqd2nOb2Mfcs8WibH5/9rVUlctIr9ONC8d1rsnsiWIQ1AYBPn/FDcwnu0tpwPijkgzRHvcsCjNKJi2npLLclcz4AtbJzB2RRgYAxFlSfyN3YPVQMWWgoxediTA0AGdmWdXKLzPk6VJum3o2c6VyxERoGgBVz3HFcREYoWZ63X7GFcfhF/FT5YB3/duFquB2auOb50s1naTqAHOD7S7oItprQNWClETe2u/rDQ5xm9k7Gl6d4VqLm0nwJrj+WkU9dnTwvepg+KRxaGSn8TPTtWYH6WASDTSIS6pFiDnzgcqsisIDkVQEmYBTZPyU755w6GK1ApL93wLgHqk16q5TeyGfwv9KwUXpHmonaZU7toLKYI1+30deVfrV+NUmc1Zj3P81xeWjRmdZyLaYyFvuOkaX76wR5vua3z7ovZ4awgOeVg7OnSD2761yOQpLts0Th8dR6I2Ix3objGeKT5u2KGvhu3TR2J36omR9TOH6HKSFhKo3oVGzABIBu7NuNS2OC/Vb3p8iuv7ptRCi8XBaEDNTWSIO00c++e5jCRIKWv0jY6bc4p/dICkl0u/75iP/LBoKblJvoRnwkmTS/aawAp2KSCjpxcUMGwF0hKqZFU9qXLaJhIVnezpRTY13AVswBr20ADisUWdJFcl6aerRE3IvXjVP/eGmSDqHUOz+Ob8CFKPLdLr9w9F2a/u5mmjrXzvT8UPezuVR9rJqfDgk0e6yuy2bpBP1aqBBKUtawIf2RsndKVNTnlTkYu/lYJrxG+tSgbQ7kQWjQ/QTrkzB7eZguER/vkY2FtCwnocb1aFeFLkrgLVcx+6HeqgkDNPm86mZqcIx4qJP0UIW3pQCXC+qas7Et0aYXj7DP+nevZEYM3RrtOUkz9uz5c2hfVs/LMh9XEI71xFapcMS0gnl/gHqANpbRhn1o9C9eFxcK41GAHmE4geC4DBHd3TLzBDf7+K0QG5vfpg6mzBh1o4OLgZOYJp3qtkw31zDQ/TgxeN2L75/kgHljE92DG4ghbjzkgjYWtzMDBW7lfhtNMq0m11WDEoaorDDjeLjhW+ab61vn69f4jmerOo16G9wP85Yb3fdcowgvMtURfmqX+9/iSijuuFfUmMwuJEHFCBL661hkovRK2NGvWyHM5zeuM6FSjKSN6doZ76adj+GUonDWLmChxK41HJIKbu858FcuJiCp3Wdrf44f0hXqn+0k8Ec6r3whUXjpTs5m+hR9wup2Dg/o/V8CGa260BQRFq/wfN9Up5FxLauqtgdCmMNLuoqT5p4Qak8a3qPSqhwPF6PWiQq9ptUL0cb6wE8yzPnyIRURMC67DoSibx2GueNZHoBY8HzkusM6VDPua677uJoNYOuOeYINZNWYuEZulpeqGRSNeitB41bPgLbTMujlCCfFoyXqXxliN1g9VSeRuJwTHXi154Q0fdjmCeBQFkD83gui4nY5jxWbje9c97JTK54wjq+bUdaHOzNqTKrNuiO68hkJY7FJVsgK2/xakG31+xdvDwtYUpDe5s5Wgii8rZgN5YK/3ykoVedZyvoBx5roQ0Pxp2pIVVXVuRtqIQbm/CSUgEl3IzcjIP+yC2LJCEH6XU5pTzC0Xh2ucig8q94btg7At0jEWxpvZxHCKwGVSWkkqXuhxAeGjj0qDTkEv0EH/NorQ6kfFtjgA7pR2npEHUrjOjGXHJBnTJEXM6MTbst0pb+yfIOLsJyZw1mZgRCsoUBV3glnPN79ctf6tH0eXr1ufb7n2M7Vc6WQ71kZkkDe3LGEHnqyWfmzvcozovFcWGju6ZXo/sq53MN9qLECAqQ4YQUeRMWEuDZOE02SuAsCeETlCrdNWm1QSkpM2aV+eHnDSVW/HYFq/oxJt+MIVJCJM4DGfUbrp81zqzOxLBWmCt06AAW7B7QznnCh0BSdZn9KqZnKqiNoauHOD1bumExEKJXQwEXwtDb50PXA//R17PH4K6T8cSI9YqrvO4OFwABi/543isIPs0GbVvjTnUzw92qK3OhYlAto8VF/zOjZ3wOQQsyDSQH+bVr2x3NJkraS98gYvwl1PW/6VQlRn+ECFLZcsD8hJSxINYKiB5EDW82gNBGWjXk9a77NZcPvxkw2L4rBdwR2TVPKbp73Wpc+3QQ/5ea4wrXX0N+08y81kuCPNGtm70UY6N9hOaj8OlbKBpMPpwJppc9Wq3AvD+noGnLdbS3J/rkla6gS87/IAGbECMYO5LApGd0kTgCERB0weocM3xmbg5ZyBomXDB/ta1gXGq6buR5img2Z/Dhc7H/daIS7iGK74N6YJ7tqRD1RPzEVE048ms/PPMqiyZv1Gu+m/wCplyh0E26pryT69vqhyMKN4GbGaV/nhApzqV7xXDYoYNui77uKFiy2XLv/zmNGFsW6SD5euRx5NoCMK7C0AtX3x754ktvv9tzfWK/qG/WVbnXC0Re0mpwGcqD/Y+BCteleeVYo1WKSkviAWFGJCNGNk8fBvY8QhrnMVegeEbB+jfuyYU48f+uITxQUqFXJyBbF1VrCac/EEb4UKbrv1CinHY/VdExyrTcvOJwICxX5aLVMxPkiXnkSDdo5UucjEx1y2+FdnSRs/hRll8I1t5TVuHuPjUSrnUPmNwJ0deE6XFHWT0XW+tDkFHwC6HywZ0mjgq0nSlXnN/pzx8BZNri+4NN/rgYjEbZFuKmiHZ7HBUrEncz3FytfMCFnK1RqhFavh2/grKxBeYfNGzlVFNLnZmKS7yYqhfvaxVyH0yIrNPbFJn6/2V3wKodtvkAYXz1enjnDs1IxT1JPNvRQx7tEwPzEK1GNmq/HUOeqCS+FxuBZUrgsGG26E2SamQOjKnkuuCdj+5HIUUnUNbYbTfR69FHNtrmpqCqSaOJpnqHoUXBAEcJnAQXHbYRtujxCw2tnUsDju2cxDwVL/Ucj458ADUQSewpbd5ecDX43n9Uy0/lg6gdUP64RUronEDA7+RcnKfpWIVf62Y/mD6ahugf8cKiBS5h/Pfmuxy+JUnRxBVnrG8yCpw67KrshSQEl/rBMvqqOU2SjwXqE3Mu5A9mjek7BJqyR3vhrGpj2lB5SGGGVebYQmGJCju68ZJnTONjIYU4xuoHe9FvBYRnvYdHjgqQPpcz++rbQSQXPwlqvdjUdy4CYdj8iFlWc35v/pNpqva+3Un4SdQupDGuHNFemo86TxoqnXXTaNTalT/bN0GDX2LR1wY3TSBQYeYVcXHZy3TICo1HxA5jvzGBwGj3V/kQNCm2u04KMKM3niFz4t95yQfSKr1ZZvMre46eXN597dtZ4KEKwDSHaLrbwg0+rr9A7QjthHXPGalkF6Io1PCcQb8pVdtz/wNK09QZL1MVpqAJrs6moqp31NJFurINBhOxQFD9RwsXcYFKZtt87C7WuwsRVeaUt+j/nwO";
+    </script>
+
+    <!-- 加密頁面（管理者用） -->
+    <div id="encrypt-page" class="section hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>加密頁面 (管理者)</h2>
+            <button class="secondary" onclick="document.getElementById('encrypt-page').classList.add('hidden'); document.getElementById('login-section').classList.remove('hidden');">返回</button>
+        </div>
+        
+        <p>及格分數：</p>
+        <input type="number" id="pass-score" value="70">
+        <p>貼上 CSV 題目（格式：題號,題目內容,選項A,選項B,選項C,選項D,答案,解析,配分,章節）</p>
+        <textarea id="csv-input" rows="10" placeholder="例如：1,HTML是什麼?,標籤語言,程式語言,資料庫,作業系統,A,用於網頁結構,10,Web基礎"></textarea>
+        <p>設定加密 Key：</p>
+        <input type="password" id="encrypt-key" placeholder="設定一組 Key">
+        <button onclick="generateQuizData()">產生加密資料</button>
+        
+        <p>明文題目資料（複製貼到 const plainQuiz = [...]）：</p>
+        <textarea id="plain-output" rows="10"></textarea>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('plain-output').value).then(()=>alert('已複製明文'));">複製明文</button>
+
+        <p>加密答案資料（複製貼到 const encryptedAnswers = "..."）：</p>
+        <textarea id="encrypted-output" rows="5"></textarea>
+        <button onclick="copyEncrypted()">複製加密</button>
+    </div>
+
+    <!-- 考試中 -->
+    <div id="quiz" class="section hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span id="chapter-badge" style="background:#eee; padding:5px 10px; border-radius:15px; font-size:0.9em;"></span>
+        </div>
+        
+        <div id="progress" class="progress"></div>
+        
+        <div id="current-question" class="question-box"></div>
+        
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+            <button class="secondary" onclick="prevQuestion()">上一題</button>
+            <button class="secondary" onclick="markQuestion()">註記/取消註記</button>
+            <button class="secondary" onclick="nextQuestion()">下一題</button>
+            <button onclick="prepareSubmit()" style="background-color: var(--danger-color); margin-left: auto;">交卷</button>
+        </div>
+    </div>
+
+    <!-- 結果頁面 -->
+    <div id="result" class="section hidden">
+        <h2>考試結果</h2>
+        <div id="score" class="result-summary"></div>
+        <div id="chapter-stats" style="margin-bottom: 30px;"></div>
+        <hr>
+        <h3>試題詳解</h3>
+        <div id="questions-review"></div>
+    </div>
+
+</div>
+
+<script>
+    let quizData = { questions: plainQuiz }; // 明文題目
+    let userAnswers = {};
+    let marks = new Set();
+    let currentIndex = 0;
+
+    function showEncryptPage() {
+        const password = prompt("請輸入管理員密碼：");
+        if (password === "admin") {
+            document.getElementById("encrypt-page").classList.remove("hidden");
+            document.getElementById("login-section").classList.add("hidden");
+        } else if (password) {
+            alert("密碼錯誤");
+        }
+    }
+
+    function copyEncrypted() {
+        const output = document.getElementById("encrypted-output");
+        output.select();
+        navigator.clipboard.writeText(output.value)
+            .then(() => alert("加密結果已複製！"))
+            .catch(() => alert("複製失敗，請手動選取"));
+    }
+
+    // 產生明文 + 加密答案
+    function generateQuizData() {
+        const csv = document.getElementById("csv-input").value;
+        const passScore = document.getElementById("pass-score").value;
+        const key = document.getElementById("encrypt-key").value;
+
+        if (!csv || !key) {
+            alert("請輸入 CSV 與 Key");
+            return;
+        }
+
+        const fullQuestions = parseCSV(csv);
+
+        // 明文部分（包含是否多選）
+        const plain = fullQuestions.map(q => ({
+            id: q.id,
+            content: q.content,
+            a: q.a, b: q.b, c: q.c, d: q.d,
+            score: q.score,
+            chapter: q.chapter,
+            isMultiple: q.answers.length > 1
+        }));
+        document.getElementById("plain-output").value = JSON.stringify(plain, null, 2);
+
+        // 加密部分
+        const answersObj = {
+            settings: { passScore: parseInt(passScore) },
+            answers: fullQuestions.map(q => ({ id: q.id, answers: q.answers, explanation: q.explanation }))
+        };
+        const encrypted = CryptoJS.AES.encrypt(JSON.stringify(answersObj), key).toString();
+        document.getElementById("encrypted-output").value = encrypted;
+    }
+
+    function parseCSV(csv) {
+        const lines = csv.split("\n").filter(line => line.trim());
+        return lines.map(line => {
+            const parts = line.split(",");
+            if (parts.length < 10) return null;
+            const [id, content, a, b, c, d, answersStr, explanation, score, chapter] = parts;
+            const answers = answersStr.trim().toUpperCase().split("").filter(char => /[A-D]/.test(char));
+            return { id: id.trim(), content: content.trim(), a: a.trim(), b: b.trim(), c: c.trim(), d: d.trim(), answers, explanation: explanation.trim(), score: parseInt(score), chapter: chapter.trim() };
+        }).filter(Boolean);
+    }
+
+    // 開始考試（無需 key）
+    function startQuiz() {
+        if (plainQuiz.length === 0 || !encryptedAnswers) {
+            alert("題目資料尚未設定，請聯絡管理者");
+            return;
+        }
+
+        document.getElementById("login-section").classList.add("hidden");
+        document.getElementById("quiz").classList.remove("hidden");
+
+        renderProgress();
+        showQuestion(0);
+    }
+
+    function renderProgress() {
+        const progressDiv = document.getElementById("progress");
+        progressDiv.innerHTML = "";
+        plainQuiz.forEach((q, i) => {
+            const status = document.createElement("div");
+            status.classList.add("status", "unanswered");
+            status.id = `status-${i}`;
+            status.textContent = q.id;
+            status.onclick = () => showQuestion(i);
+            progressDiv.appendChild(status);
+        });
+        updateProgress();
+    }
+
+    function updateProgress() {
+        document.querySelectorAll(".status").forEach((status, i) => {
+            status.className = "status";
+            if (i === currentIndex) status.classList.add("current");
+            if (marks.has(i)) status.classList.add("marked");
+            else if (userAnswers[i] && userAnswers[i].length > 0) status.classList.add("answered");
+            else status.classList.add("unanswered");
+        });
+    }
+
+    function showQuestion(index) {
+        currentIndex = index;
+        const q = plainQuiz[index];
+        const isMultiple = q.isMultiple || false; // 預設單選
+        const questionDiv = document.getElementById("current-question");
+
+        document.getElementById("chapter-badge").textContent = q.chapter || "綜合";
+
+        questionDiv.innerHTML = `
+            <div class="question-content">
+                <span style="color:var(--primary-color);">[${isMultiple ? "多選題" : "單選題"}]</span> 
+                第 ${q.id} 題: ${q.content} 
+                <span style="font-size:0.8em; color:#888;">(${q.score}分)</span>
+            </div>
+            <form id="options-form" class="options-list">
+                <label><input type="${isMultiple ? 'checkbox' : 'radio'}" name="option" value="A"> <strong>A.</strong> ${q.a}</label>
+                <label><input type="${isMultiple ? 'checkbox' : 'radio'}" name="option" value="B"> <strong>B.</strong> ${q.b}</label>
+                <label><input type="${isMultiple ? 'checkbox' : 'radio'}" name="option" value="C"> <strong>C.</strong> ${q.c}</label>
+                <label><input type="${isMultiple ? 'checkbox' : 'radio'}" name="option" value="D"> <strong>D.</strong> ${q.d}</label>
+            </form>
+        `;
+
+        const selected = userAnswers[index] || [];
+        const inputs = questionDiv.querySelectorAll("input");
+        inputs.forEach(input => {
+            input.checked = selected.includes(input.value);
+            input.onchange = saveAnswer;
+        });
+
+        updateProgress();
+    }
+
+    function saveAnswer() {
+        const form = document.getElementById("options-form");
+        const inputs = form.querySelectorAll("input");
+        const isRadio = form.querySelector("input[type='radio']");
+
+        let selected = [];
+        if (isRadio) {
+            // 單選：只取選中的一個
+            const checked = form.querySelector("input[type='radio']:checked");
+            if (checked) selected = [checked.value];
+        } else {
+            // 多選：取所有勾選
+            selected = Array.from(form.querySelectorAll("input[type='checkbox']:checked")).map(inp => inp.value);
+        }
+
+        userAnswers[currentIndex] = selected.length > 0 ? selected : undefined;
+        updateProgress();
+    }
+
+    function markQuestion() {
+        marks.has(currentIndex) ? marks.delete(currentIndex) : marks.add(currentIndex);
+        updateProgress();
+    }
+
+    function prevQuestion() {
+        if (currentIndex > 0) showQuestion(currentIndex - 1);
+    }
+
+    function nextQuestion() {
+        if (currentIndex < plainQuiz.length - 1) showQuestion(currentIndex + 1);
+    }
+
+    function prepareSubmit() {
+        const answeredCount = Object.keys(userAnswers).filter(k => userAnswers[k] && userAnswers[k].length > 0).length;
+        const total = plainQuiz.length;
+        const unanswered = total - answeredCount;
+
+        let msg = `總共 ${total} 題，已答 ${answeredCount} 題`;
+        if (unanswered > 0) msg += `，還有 ${unanswered} 題未答`;
+        msg += "\n\n確定交卷？（交卷後需監考輸入 key 才能看結果）";
+
+        if (!confirm(msg)) return;
+
+        document.getElementById("quiz").classList.add("hidden");
+        const keySection = document.createElement("div");
+        keySection.id = "submit-key-section";
+        keySection.className = "section";
+        keySection.innerHTML = `
+            <h2>交卷確認</h2>
+            <p>監考人員請輸入解密 key：</p>
+            <input type="password" id="decrypt-key" placeholder="輸入 key" onkeydown="if(event.key==='Enter') submitWithKey();">
+            <button onclick="submitWithKey()">確認解密並顯示結果</button>
+        `;
+        document.querySelector(".container").appendChild(keySection);
+    }
+
+    function submitWithKey() {
+        const key = document.getElementById("decrypt-key").value;
+        if (!key) return alert("請輸入 key");
+
+        try {
+            const decrypted = CryptoJS.AES.decrypt(encryptedAnswers, key).toString(CryptoJS.enc.Utf8);
+            if (!decrypted) throw new Error("解密失敗");
+
+            const answersData = JSON.parse(decrypted);
+            quizData.settings = answersData.settings;
+            quizData.answers = answersData.answers;
+
+            document.getElementById("submit-key-section")?.remove();
+            showResult();
+        } catch (e) {
+            alert("Key 錯誤或解密失敗");
+        }
+    }
+
+    function showResult() {
+        document.getElementById("result").classList.remove("hidden");
+
+        let totalScore = 0;
+        let maxScore = 0;
+        const chapterStats = {};
+        const reviewDiv = document.getElementById("questions-review");
+        reviewDiv.innerHTML = "";
+
+        plainQuiz.forEach((q, i) => {
+            const ansObj = quizData.answers?.find(a => a.id === q.id) || {};
+            const correctAnswers = ansObj.answers || [];
+            const explanation = ansObj.explanation || "無解析";
+            const isMultiple = q.isMultiple || false;
+
+            const userAns = userAnswers[i] || [];
+            const isCorrect = arraysEqual(userAns.sort(), correctAnswers.sort());
+            const score = isCorrect ? q.score : 0;
+            totalScore += score;
+            maxScore += q.score;
+
+            if (!chapterStats[q.chapter]) chapterStats[q.chapter] = { correct: 0, total: 0 };
+            chapterStats[q.chapter].total++;
+            if (isCorrect) chapterStats[q.chapter].correct++;
+
+            let optionsHtml = '';
+            ['A','B','C','D'].forEach(label => {
+                const val = q[label.toLowerCase()];
+                let className = 'review-option opt-normal';
+                let prefix = `${label}. `;
+
+                if (correctAnswers.includes(label)) {
+                    className = 'review-option opt-correct';
+                    prefix = `(正解) ${label}. `;
+                } else if (userAns.includes(label)) {
+                    className = 'review-option opt-wrong-choice';
+                    prefix = `(誤選) ${label}. `;
+                }
+
+                optionsHtml += `<div class="${className}">${prefix}${val}</div>`;
+            });
+
+            reviewDiv.innerHTML += `
+                <div class="review-item ${isCorrect ? 'correct-answer-item' : 'wrong-answer-item'}">
+                    <h3>[${isMultiple ? '多選題' : '單選題'}] 題號 ${q.id} <span style="font-size:0.8em; font-weight:normal; margin-left:10px;">(${isCorrect ? '答對' : '答錯'}，得 ${score} 分)</span></h3>
+                    <div style="font-weight:bold; margin-bottom:10px;">${q.content}</div>
+                    <div style="margin-left: 10px;">${optionsHtml}</div>
+                    <div class="explanation"><strong>解析：</strong><br>${explanation}</div>
+                </div>
+            `;
+        });
+
+        const passScore = quizData.settings?.passScore || 70;
+        const isPass = totalScore >= passScore;
+        const resultColor = isPass ? "var(--success-color)" : "var(--danger-color)";
+
+        document.getElementById("score").innerHTML = `
+            <h1 style="color:${resultColor}; font-size: 3em; margin: 10px 0;">${totalScore} <span style="font-size:0.4em; color:#666;">/ ${maxScore}</span></h1>
+            <h3 style="color:${resultColor}">${isPass ? "恭喜及格！" : "未通過"}</h3>
+            <p>及格標準：${passScore} 分</p>
+        `;
+
+        let statsHtml = "<div style='display:flex; flex-wrap:wrap; gap:10px;'>";
+        for (const [chapter, stats] of Object.entries(chapterStats)) {
+            const ratio = Math.round((stats.correct / stats.total) * 100);
+            statsHtml += `
+                <div style="background:#fff; border:1px solid #ddd; padding:10px; border-radius:5px; flex:1; min-width:150px; text-align:center;">
+                    <strong>${chapter}</strong><br>
+                    答對: ${stats.correct}/${stats.total}<br>
+                    <div style="background:#eee; height:5px; width:100%; margin-top:5px; border-radius:3px;">
+                        <div style="background:${ratio >= 80 ? 'var(--success-color)' : ratio >= 60 ? 'var(--warning-color)' : 'var(--danger-color)'}; width:${ratio}%; height:100%; border-radius:3px;"></div>
+                    </div>
+                    <span style="font-size:0.8em; color:#666;">${ratio}%</span>
+                </div>`;
+        }
+        statsHtml += "</div>";
+        document.getElementById("chapter-stats").innerHTML = statsHtml;
+    }
+
+    function arraysEqual(a, b) {
+        if (a.length !== b.length) return false;
+        return a.every((val, idx) => val === b[idx]);
+    }
+</script>
+
+</body>
+</html>
